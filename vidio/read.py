@@ -28,13 +28,21 @@ class BaseReader:
             self.close()
             raise StopIteration
 
-    def read(self, framenum: int) -> np.ndarray:
+    def read(self, framenum: Union[int, slice]) -> Union[np.ndarray, list]:
         """Read the frame indicated in framenum from disk
 
         Uses sequential reads where possible if using OpenCV to read
         """
+        if type(framenum) == slice:
+            return [self.read(i) for i in self.slice_to_list(framenum)]
         if framenum < 0 or framenum > self.nframes:
             raise ValueError('frame number requested outside video bounds: {}'.format(framenum))
+
+    def slice_to_list(self, slice_obj):
+        # https://stackoverflow.com/questions/13855288/turn-slice-into-range
+        if slice_obj.stop > self.nframes:
+            raise ValueError('Slice end {} > nframes {}'.format(slice_obj.stop, self.nframes))
+        return list(range(self.nframes)[slice_obj])
 
     def process_frame(self, frame):
         return frame
@@ -51,7 +59,7 @@ class BaseReader:
     def __exit__(self, type, value, traceback):
         self.close()
 
-    def __getitem__(self, framenum: int) -> np.ndarray:
+    def __getitem__(self, *args, **kwargs) -> Union[np.ndarray, list]:
         """Wrapper around `read`
 
         Args:
@@ -59,7 +67,7 @@ class BaseReader:
         Example:
             frame = reader[10]
         """
-        return self.read(framenum)
+        return self.read(*args, **kwargs)
 
     def close(self):
         """Closes open file objects"""
@@ -93,8 +101,10 @@ class OpenCVReader(BaseReader):
 
         Uses sequential reads where possible if using OpenCV to read
         """
-        # does checks
-        super().read(framenum)
+        # does checks. if framenum is a slice, calls read recursively. In that case, just return
+        output = super().read(framenum)
+        if output is not None:
+            return output
 
         if framenum != self.fnum:
             self.file_object.set(int(cv2.CAP_PROP_POS_FRAMES), framenum)
@@ -138,9 +148,11 @@ class DirectoryReader(BaseReader):
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         return frame
 
-    def read(self, framenum: int) -> np.ndarray:
-        # does checks
-        super().read(framenum)
+    def read(self, framenum: Union[int, slice]) -> Union[np.ndarray, list]:
+        # does checks. if framenum is a slice, calls read recursively. In that case, just return
+        output = super().read(framenum)
+        if output is not None:
+            return output
 
         frame = cv2.imread(self.file_object[framenum], 1)
         frame = self.process_frame(frame)
@@ -163,7 +175,10 @@ class HDF5Reader(BaseReader):
         return self.process_frame(frame)
 
     def read(self, framenum):
-        super().read(framenum)
+        # does checks. if framenum is a slice, calls read recursively. In that case, just return
+        output = super().read(framenum)
+        if output is not None:
+            return output
         frame = cv2.imdecode(self.file_object['frame'][framenum], 1)
         self.fnum = framenum + 1
         return self.process_frame(frame)
