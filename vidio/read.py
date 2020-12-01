@@ -119,23 +119,42 @@ class OpenCVReader(BaseReader):
             del self.file_object
 
 
+class FilenameGetter:
+    def __init__(self, directory, ending: str = '.png'):
+        self.directory = directory
+        self.ending = ending
+
+    def __getitem__(self, idx):
+        filename = os.path.join(self.directory, '{:09d}'.format(idx) + self.ending)
+        return filename
+
+
 class DirectoryReader(BaseReader):
-    def __init__(self, filename: Union[str, bytes, os.PathLike]) -> None:
+    def __init__(self, filename: Union[str, bytes, os.PathLike], assume_writer_style=False,
+                 filetype='.png') -> None:
         assert os.path.isdir(filename)
+        if assume_writer_style:
+            self.file_object = FilenameGetter(filename, ending=filetype)
+            nframes = 999999999
+        else:
+            imagefiles = self.find_imagefiles(filename)
+            assert len(imagefiles) > 0
+            self.file_object = imagefiles
+            nframes = len(self.file_object)
+        # superclass gets nframes
+        super().__init__(filename, nframes)
+
+    def find_imagefiles(self, directory):
         endings = ['.bmp', '.jpg', '.png', '.jpeg', '.tiff', '.tif']
-        files = os.listdir(filename)
+        files = os.listdir(directory)
         files.sort()
-        files = [os.path.join(filename, i) for i in files]
+        files = [os.path.join(directory, i) for i in files]
         imagefiles = []
         for i in files:
             _, ext = os.path.splitext(i)
             if ext in endings:
                 imagefiles.append(i)
-        assert len(imagefiles) > 0
-        self.file_object = imagefiles
-        nframes = len(self.file_object)
-        # superclass gets nframes
-        super().__init__(filename, nframes)
+        return imagefiles
 
     def __next__(self):
         super().__next__()
@@ -158,7 +177,6 @@ class DirectoryReader(BaseReader):
         frame = self.process_frame(frame)
         self.fnum = framenum + 1
         return frame
-
 
 class HDF5Reader(BaseReader):
     def __init__(self, filename: Union[str, bytes, os.PathLike]) -> None:
@@ -196,7 +214,7 @@ class HDF5Reader(BaseReader):
             del self.file_object
 
 
-def VideoReader(filename):
+def VideoReader(filename, assume_writer_style=False, filetype='.png'):
     """Class for reading videos using OpenCV or JPGs encoded in an HDF5 file.
 
     Features:
@@ -222,7 +240,7 @@ def VideoReader(filename):
     """
     if not os.path.isfile(filename):
         assert os.path.isdir(filename)
-        return DirectoryReader(filename)
+        return DirectoryReader(filename, assume_writer_style, filetype)
     else:
         _, ext = os.path.splitext(filename)
         ext = ext[1:].lower()
