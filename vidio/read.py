@@ -83,6 +83,7 @@ class OpenCVReader(BaseReader):
         self.file_object = cv2.VideoCapture(filename)
         nframes = int(self.file_object.get(cv2.CAP_PROP_FRAME_COUNT))
         super().__init__(filename, nframes)
+        self.fps = self.file_object.get(cv2.CAP_PROP_FPS)
 
     def __next__(self):
         super().__next__()
@@ -177,6 +178,7 @@ class DirectoryReader(BaseReader):
         frame = self.process_frame(frame)
         self.fnum = framenum + 1
         return frame
+
 
 class HDF5Reader(BaseReader):
     def __init__(self, filename: Union[str, bytes, os.PathLike]) -> None:
