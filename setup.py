@@ -5,7 +5,7 @@ with open("README.md", 'r') as f:
 
 setuptools.setup(
     name='vidio',
-    version='0.0.2',
+    version='0.0.3',
     author='Jim Bohnslav',
     author_email='jbohnslav@gmail.com',
     description='Video file IO',
