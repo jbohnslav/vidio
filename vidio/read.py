@@ -80,6 +80,7 @@ class BaseReader:
 
 class OpenCVReader(BaseReader):
     def __init__(self, filename: Union[str, bytes, os.PathLike]):
+        self.filename = filename
         self.file_object = cv2.VideoCapture(filename)
         nframes = int(self.file_object.get(cv2.CAP_PROP_FRAME_COUNT))
         super().__init__(filename, nframes)
@@ -110,6 +111,8 @@ class OpenCVReader(BaseReader):
         if framenum != self.fnum:
             self.file_object.set(int(cv2.CAP_PROP_POS_FRAMES), framenum)
         ret, frame = self.file_object.read()
+        if not ret:
+            raise ValueError('error decoding frame {} from video {}'.format(framenum, self.filename))
         frame = self.process_frame(frame)
         self.fnum = framenum + 1
         return frame
@@ -175,6 +178,8 @@ class DirectoryReader(BaseReader):
             return output
 
         frame = cv2.imread(self.file_object[framenum], 1)
+        if frame is None:
+            raise ValueError('Error reading image file {}'.format(self.file_object[framenum]))
         frame = self.process_frame(frame)
         self.fnum = framenum + 1
         return frame
@@ -183,6 +188,7 @@ class DirectoryReader(BaseReader):
 class HDF5Reader(BaseReader):
     def __init__(self, filename: Union[str, bytes, os.PathLike]) -> None:
         assert os.path.isfile(filename)
+        self.filename = filename
         self.file_object = h5py.File(filename, 'r')
         nframes = len(self.file_object['frame'])
         super().__init__(filename, nframes)
@@ -200,6 +206,8 @@ class HDF5Reader(BaseReader):
         if output is not None:
             return output
         frame = cv2.imdecode(self.file_object['frame'][framenum], 1)
+        if frame is None:
+            raise ValueError('error decoding frame {} from file {}'.format(framenum, filename))
         self.fnum = framenum + 1
         return self.process_frame(frame)
 
