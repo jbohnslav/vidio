@@ -20,5 +20,5 @@ setuptools.setup(
     python_requires='>=3.6',
     install_requires=['h5py',
                       'numpy',
-                      'opencv-python']
+                      'opencv-python-headless']
 )
